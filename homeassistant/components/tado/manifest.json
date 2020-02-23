@@ -2,6 +2,7 @@
   "domain": "tado",
   "name": "Tado",
   "documentation": "https://www.home-assistant.io/integrations/tado",
+  "config_flow": true,
   "requirements": [
     "python-tado==0.3.0"
   ],

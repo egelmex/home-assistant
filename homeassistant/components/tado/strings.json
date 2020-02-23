@@ -1,0 +1,19 @@
+{
+    "config": {
+        "title": "Tado",
+        "step": {
+            "user": {
+                "title": "Login",
+                "description": "tado",
+                "data": {
+                    "username": "Username",
+					"password": "Password",
+					"fallback": "Fallback"
+                }
+            }
+        },
+        "error": {
+            "name_exists": "Location already exists"
+        }
+    }
+}

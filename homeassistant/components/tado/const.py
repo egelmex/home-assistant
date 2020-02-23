@@ -1,5 +1,7 @@
 """Constant values for the Tado component."""
 
+DOMAIN = "tado"
+
 # Configuration
 CONF_FALLBACK = "fallback"
 DATA = "data"

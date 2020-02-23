@@ -90,6 +90,7 @@ FLOWS = [
     "sonos",
     "spotify",
     "starline",
+    "tado",
     "tellduslive",
     "tesla",
     "toon",

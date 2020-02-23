@@ -1,22 +1,27 @@
 """Support for the (unofficial) Tado API."""
 from datetime import timedelta
 import logging
+import pprint
 import urllib
 
 from PyTado.interface import Tado
 import voluptuous as vol
 
+from homeassistant.config_entries import SOURCE_IMPORT
 from homeassistant.const import CONF_PASSWORD, CONF_USERNAME
 from homeassistant.helpers import config_validation as cv
 from homeassistant.helpers.discovery import load_platform
 from homeassistant.helpers.dispatcher import dispatcher_send
 from homeassistant.util import Throttle
 
-from .const import CONF_FALLBACK, DATA
+from .config_flow import configured_instances
+from .const import CONF_FALLBACK, DATA, DOMAIN
+
+pp = pprint.PrettyPrinter(indent=4)
+
 
 _LOGGER = logging.getLogger(__name__)
 
-DOMAIN = "tado"
 
 SIGNAL_TADO_UPDATE_RECEIVED = "tado_update_received_{}_{}"
 
@@ -42,40 +47,64 @@ CONFIG_SCHEMA = vol.Schema(
 )
 
 
-def setup(hass, config):
+async def async_setup(hass, config):
+    """Set up configured tado."""
+    if DOMAIN not in config:
+        return True
+
     """Set up of the Tado component."""
     acc_list = config[DOMAIN]
-
-    api_data_list = []
 
     for acc in acc_list:
         username = acc[CONF_USERNAME]
         password = acc[CONF_PASSWORD]
         fallback = acc[CONF_FALLBACK]
 
-        tadoconnector = TadoConnector(hass, username, password, fallback)
-        if not tadoconnector.setup():
-            continue
+        if username in configured_instances(hass):
+            return True
 
-        # Do first update
-        tadoconnector.update()
-
-        api_data_list.append(tadoconnector)
-        # Poll for updates in the background
-        hass.helpers.event.track_time_interval(
-            # we're using here tadoconnector as a parameter of lambda
-            # to capture actual value instead of closuring of latest value
-            lambda now, tc=tadoconnector: tc.update(),
-            SCAN_INTERVAL,
+        hass.async_create_task(
+            hass.config_entries.flow.async_init(
+                DOMAIN,
+                context={"source": SOURCE_IMPORT},
+                data={
+                    CONF_USERNAME: username,
+                    CONF_PASSWORD: password,
+                    CONF_FALLBACK: fallback,
+                },
+            )
         )
 
+    return True
+
+
+async def async_setup_entry(hass, config_entry):
+    """Set up tado as config entry."""
+
+    pp.pprint(config_entry.data)
+
+    tadoconnector = TadoConnector(hass, config_entry.data)
+    if not tadoconnector.setup():
+        return False
+
+    # Do first update
+    tadoconnector.update()
+
+    # Poll for updates in the background
+    hass.helpers.event.track_time_interval(
+        # we're using here tadoconnector as a parameter of lambda
+        # to capture actual value instead of closuring of latest value
+        lambda now, tc=tadoconnector: tc.update(),
+        SCAN_INTERVAL,
+    )
+
     hass.data[DOMAIN] = {}
-    hass.data[DOMAIN][DATA] = api_data_list
+    hass.data[DOMAIN][DATA] = tadoconnector
 
     # Load components
     for component in TADO_COMPONENTS:
         load_platform(
-            hass, component, DOMAIN, {}, config,
+            hass, component, DOMAIN, {}, config_entry,
         )
 
     return True
@@ -84,12 +113,12 @@ def setup(hass, config):
 class TadoConnector:
     """An object to store the Tado data."""
 
-    def __init__(self, hass, username, password, fallback):
+    def __init__(self, hass, data):
         """Initialize Tado Connector."""
         self.hass = hass
-        self._username = username
-        self._password = password
-        self._fallback = fallback
+        self._username = data[CONF_USERNAME]
+        self._password = data[CONF_PASSWORD]
+        self._fallback = data[CONF_FALLBACK]
 
         self.device_id = None
         self.tado = None
