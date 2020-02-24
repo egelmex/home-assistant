@@ -1,7 +1,6 @@
 """Support for the (unofficial) Tado API."""
 from datetime import timedelta
 import logging
-import pprint
 import urllib
 
 from PyTado.interface import Tado
@@ -10,15 +9,11 @@ import voluptuous as vol
 from homeassistant.config_entries import SOURCE_IMPORT
 from homeassistant.const import CONF_PASSWORD, CONF_USERNAME
 from homeassistant.helpers import config_validation as cv
-from homeassistant.helpers.discovery import load_platform
 from homeassistant.helpers.dispatcher import dispatcher_send
 from homeassistant.util import Throttle
 
 from .config_flow import configured_instances
 from .const import CONF_FALLBACK, DATA, DOMAIN
-
-pp = pprint.PrettyPrinter(indent=4)
-
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -78,33 +73,35 @@ async def async_setup(hass, config):
     return True
 
 
-async def async_setup_entry(hass, config_entry):
+async def async_setup_entry(hass, config):
     """Set up tado as config entry."""
-
-    pp.pprint(config_entry.data)
-
-    tadoconnector = TadoConnector(hass, config_entry.data)
-    if not tadoconnector.setup():
+    tadoconnector = TadoConnector(hass, config.data)
+    if not tadoconnector.connect():
         return False
+
+    tadoconnector.setup()
 
     # Do first update
     tadoconnector.update()
 
     # Poll for updates in the background
-    hass.helpers.event.track_time_interval(
+    hass.helpers.event.async_track_time_interval(
         # we're using here tadoconnector as a parameter of lambda
         # to capture actual value instead of closuring of latest value
         lambda now, tc=tadoconnector: tc.update(),
         SCAN_INTERVAL,
     )
 
-    hass.data[DOMAIN] = {}
-    hass.data[DOMAIN][DATA] = tadoconnector
+    if DOMAIN not in hass.data:
+        hass.data[DOMAIN] = {}
+        hass.data[DOMAIN][DATA] = []
+
+    hass.data[DOMAIN][DATA].append(tadoconnector)
 
     # Load components
     for component in TADO_COMPONENTS:
-        load_platform(
-            hass, component, DOMAIN, {}, config_entry,
+        hass.async_add_job(
+            hass.config_entries.async_forward_entry_setup(config, component)
         )
 
     return True
@@ -134,13 +131,17 @@ class TadoConnector:
         """Return fallback flag to Smart Schedule."""
         return self._fallback
 
-    def setup(self):
-        """Connect to Tado and fetch the zones."""
+    def connect(self):
+        """Connect."""
         try:
             self.tado = Tado(self._username, self._password)
         except (RuntimeError, urllib.error.HTTPError) as exc:
             _LOGGER.error("Unable to connect: %s", exc)
             return False
+        return True
+
+    def setup(self):
+        """Connect to Tado and fetch the zones."""
 
         self.tado.setDebugging(True)
 

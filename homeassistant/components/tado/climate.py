@@ -73,10 +73,8 @@ SUPPORT_FAN = [FAN_HIGH, FAN_MIDDLE, FAN_LOW, FAN_OFF]
 SUPPORT_PRESET = [PRESET_AWAY, PRESET_HOME]
 
 
-def setup_platform(hass, config, add_entities, discovery_info=None):
+async def async_setup_entry(hass, config, async_add_devices):
     """Set up the Tado climate platform."""
-    if discovery_info is None:
-        return
 
     api_list = hass.data[DOMAIN][DATA]
     entities = []
@@ -89,7 +87,7 @@ def setup_platform(hass, config, add_entities, discovery_info=None):
                     entities.append(entity)
 
     if entities:
-        add_entities(entities, True)
+        async_add_devices(entities, True)
 
 
 def create_climate_entity(tado, name: str, zone_id: int):
@@ -172,6 +170,15 @@ class TadoClimate(ClimateDevice):
         self._current_fan = CONST_MODE_OFF
         self._current_operation = CONST_MODE_SMART_SCHEDULE
         self._overlay_mode = CONST_MODE_SMART_SCHEDULE
+
+    @property
+    def device_info(self):
+        """Get tado device info."""
+        return {
+            "identifiers": {(DOMAIN, self.zone_id)},
+            "name": self.zone_name,
+            "manufacturer": "Tado",
+        }
 
     async def async_added_to_hass(self):
         """Register for sensor updates."""

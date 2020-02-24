@@ -38,7 +38,8 @@ ZONE_SENSORS = {
 DEVICE_SENSORS = ["tado bridge status"]
 
 
-def setup_platform(hass, config, add_entities, discovery_info=None):
+# def setup_platform(hass, config, add_entities, discovery_info=None):
+async def async_setup_entry(hass, config, async_add_devices):
     """Set up the sensor platform."""
     api_list = hass.data[DOMAIN][DATA]
 
@@ -64,7 +65,7 @@ def setup_platform(hass, config, add_entities, discovery_info=None):
                 ]
             )
 
-    add_entities(entities, True)
+    async_add_devices(entities, True)
 
 
 def create_zone_sensor(tado, name, zone_id, variable):
@@ -93,6 +94,15 @@ class TadoSensor(Entity):
 
         self._state = None
         self._state_attributes = None
+
+    @property
+    def device_info(self):
+        """Get tado device info."""
+        return {
+            "identifiers": {(DOMAIN, self.zone_id)},
+            "name": self.zone_name,
+            "manufacturer": "Tado",
+        }
 
     async def async_added_to_hass(self):
         """Register for sensor updates."""
