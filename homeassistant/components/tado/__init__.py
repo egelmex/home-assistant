@@ -1,4 +1,5 @@
 """Support for the (unofficial) Tado API."""
+
 from datetime import timedelta
 import logging
 import urllib
@@ -44,6 +45,9 @@ CONFIG_SCHEMA = vol.Schema(
 
 async def async_setup(hass, config):
     """Set up configured tado."""
+    hass.data[DOMAIN] = {}
+    hass.data[DOMAIN][DATA] = []
+
     if DOMAIN not in config:
         return True
 
@@ -91,10 +95,6 @@ async def async_setup_entry(hass, config):
         lambda now, tc=tadoconnector: tc.update(),
         SCAN_INTERVAL,
     )
-
-    if DOMAIN not in hass.data:
-        hass.data[DOMAIN] = {}
-        hass.data[DOMAIN][DATA] = []
 
     hass.data[DOMAIN][DATA].append(tadoconnector)
 
